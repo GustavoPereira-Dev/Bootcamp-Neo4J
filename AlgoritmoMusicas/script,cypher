@@ -1,0 +1,47 @@
+// --- 1. Constraints ---
+CREATE CONSTRAINT IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE;
+CREATE CONSTRAINT IF NOT EXISTS FOR (s:Song) REQUIRE s.id IS UNIQUE;
+CREATE CONSTRAINT IF NOT EXISTS FOR (a:Artist) REQUIRE a.name IS UNIQUE;
+
+// --- 2. Gêneros e Artistas ---
+CREATE (:Genre {name: 'Rock'}), (:Genre {name: 'Pop'}), (:Genre {name: 'Jazz'}), (:Genre {name: 'Lo-fi'});
+
+CREATE (a1:Artist {name: 'Queen'}),
+       (a2:Artist {name: 'Taylor Swift'}),
+       (a3:Artist {name: 'Miles Davis'}),
+       (a4:Artist {name: 'Lofi Girl'});
+
+// --- 3. Músicas (Songs) ---
+CREATE (s1:Song {id: 'S1', title: 'Bohemian Rhapsody'}),
+       (s2:Song {id: 'S2', title: 'Anti-Hero'}),
+       (s3:Song {id: 'S3', title: 'So What'}),
+       (s4:Song {id: 'S4', title: 'Morning Coffee'}),
+       (s5:Song {id: 'S5', title: 'Don't Stop Me Now'});
+
+// --- 4. Relacionamentos de Obra ---
+MATCH (a:Artist {name: 'Queen'}), (s:Song) WHERE s.title IN ['Bohemian Rhapsody', 'Don\'t Stop Me Now'] CREATE (a)<-[:PERFORMED_BY]-(s);
+MATCH (s:Song {title: 'Bohemian Rhapsody'}), (g:Genre {name: 'Rock'}) CREATE (s)-[:BELONGS_TO]->(g);
+MATCH (s:Song {title: 'Anti-Hero'}), (g:Genre {name: 'Pop'}) CREATE (s)-[:BELONGS_TO]->(g);
+
+// --- 5. Usuários e Interações ---
+CREATE (u1:User {id: 101, name: 'Alice'}),
+       (u2:User {id: 102, name: 'Bruno'});
+
+// Alice segue Queen e ouviu Rock várias vezes
+MATCH (u:User {id: 101}), (a:Artist {name: 'Queen'}) CREATE (u)-[:FOLLOWS]->(a);
+MATCH (u:User {id: 101}), (s:Song {title: 'Bohemian Rhapsody'}) CREATE (u)-[:LISTENED {play_count: 42}]->(s), (u)-[:LIKED]->(s);
+
+// Bruno ouviu Taylor Swift mas também ouviu Queen
+MATCH (u:User {id: 102}), (s:Song {title: 'Anti-Hero'}) CREATE (u)-[:LISTENED {play_count: 15}]->(s);
+MATCH (u:User {id: 102}), (s:Song {title: 'Bohemian Rhapsody'}) CREATE (u)-[:LISTENED {play_count: 5}]->(s);
+
+// Recomendação por "Gosto Similar" (Filtragem Colaborativa)
+MATCH (me:User {id: 101})-[:LISTENED]->(s:Song)<-[:LISTENED]-(others:User)-[:LIKED]->(rec:Song)
+WHERE NOT (me)-[:LISTENED]->(rec)
+RETURN rec.title, count(others) AS recomendacoes
+ORDER BY recomendacoes DESC;
+
+// Recomendação por "Artista Seguido"
+MATCH (u:User {id: 101})-[:FOLLOWS]->(a:Artist)<-[:PERFORMED_BY]-(s:Song)
+WHERE NOT (u)-[:LISTENED]->(s)
+RETURN s.title AS sugestao, a.name AS artista;
